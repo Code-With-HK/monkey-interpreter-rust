@@ -52,6 +52,10 @@ impl Lexer {
                     let literal = self.read_identifier();
                     let kind = lookup_ident(&literal);
                     Token { kind, literal }
+                } else if Lexer::is_digit(self.ch) {
+                    let kind = TokenKind::Int;
+                    let literal = self.read_number();
+                    Token { kind, literal }
                 } else {
                     Lexer::new_token(TokenKind::Illegal, self.ch)
                 };
@@ -89,6 +93,20 @@ impl Lexer {
         }
 
         identifier
+    }
+
+    fn is_digit(ch: char) -> bool {
+        ch.is_numeric()
+    }
+
+    fn read_number(&mut self) -> String {
+        let mut num = String::from("");
+
+        while Lexer::is_digit(self.ch) {
+            num.push(self.ch);
+            self.read_char();
+        }
+        num
     }
 }
 
