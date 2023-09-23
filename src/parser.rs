@@ -32,7 +32,7 @@ impl Parser {
     pub fn parse_program(&mut self) -> Option<Program> {
         let mut program = Program { statements: vec![] };
 
-        while self.cur_token.kind != TokenKind::Eof {
+        while !self.cur_token_is(TokenKind::Eof) {
             if let Some(statement) = self.parse_statement() {
                 program.statements.push(statement);
             }
@@ -68,6 +68,7 @@ impl Parser {
                 None
             } else {
                 self.next_token();
+                // TODO: need to parse expression
                 while !self.cur_token_is(TokenKind::Semicolon) {
                     self.next_token();
                 }
