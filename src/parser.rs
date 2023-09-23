@@ -1,4 +1,8 @@
-use crate::{ast::Program, lexer::Lexer, token::Token};
+use crate::{
+    ast::{Identifier, LetStatement, Program, StatementNode},
+    lexer::Lexer,
+    token::{Token, TokenKind},
+};
 
 pub struct Parser {
     lexer: Lexer,
@@ -26,7 +30,66 @@ impl Parser {
     }
 
     pub fn parse_program(&mut self) -> Option<Program> {
-        None
+        let mut program = Program { statements: vec![] };
+
+        while self.cur_token.kind != TokenKind::Eof {
+            if let Some(statement) = self.parse_statement() {
+                program.statements.push(statement);
+            }
+            self.next_token();
+        }
+
+        Some(program)
+    }
+
+    fn parse_statement(&mut self) -> Option<StatementNode> {
+        match self.cur_token.kind {
+            TokenKind::Let => self.parse_let_statement(),
+            _ => None,
+        }
+    }
+
+    fn parse_let_statement(&mut self) -> Option<StatementNode> {
+        let mut stmt = LetStatement {
+            token: self.cur_token.clone(),
+            name: Default::default(),
+            value: Default::default(),
+        };
+
+        return if !self.expect_peek(TokenKind::Ident) {
+            None
+        } else {
+            stmt.name = Identifier {
+                token: self.cur_token.clone(),
+                value: self.cur_token.literal.clone(),
+            };
+
+            if !self.expect_peek(TokenKind::Assign) {
+                None
+            } else {
+                self.next_token();
+                while !self.cur_token_is(TokenKind::Semicolon) {
+                    self.next_token();
+                }
+                Some(StatementNode::Let(stmt))
+            }
+        };
+    }
+
+    fn expect_peek(&mut self, token_kind: TokenKind) -> bool {
+        if self.peek_token_is(token_kind) {
+            self.next_token();
+            return true;
+        }
+        false
+    }
+
+    fn peek_token_is(&self, token_kind: TokenKind) -> bool {
+        self.peek_token.kind == token_kind
+    }
+
+    fn cur_token_is(&self, token_kind: TokenKind) -> bool {
+        self.cur_token.kind == token_kind
     }
 }
 

@@ -1,4 +1,4 @@
-use std::{default, fmt::Display};
+use std::fmt::Display;
 
 #[derive(PartialEq, Debug, Default, Clone)]
 pub struct Token {
