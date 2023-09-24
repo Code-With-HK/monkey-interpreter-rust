@@ -167,3 +167,46 @@ impl Node for ExpressionStatement {
         String::from("")
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        ast::Node,
+        token::{Token, TokenKind},
+    };
+
+    use super::{ExpressionNode, Identifier, LetStatement, Program, StatementNode};
+
+    #[test]
+    fn test_print_string() {
+        let program = Program {
+            statements: vec![StatementNode::Let(LetStatement {
+                token: Token {
+                    kind: TokenKind::Let,
+                    literal: String::from("let"),
+                },
+                name: Identifier {
+                    token: Token {
+                        kind: TokenKind::Ident,
+                        literal: String::from("myVar"),
+                    },
+                    value: String::from("myVar"),
+                },
+                value: Some(ExpressionNode::IdentifierNode(Identifier {
+                    token: Token {
+                        kind: TokenKind::Ident,
+                        literal: String::from("anotherVar"),
+                    },
+                    value: String::from("anotherVar"),
+                })),
+            })],
+        };
+
+        assert_eq!(
+            program.print_string(),
+            String::from("let myVar = anotherVar;"),
+            "print string wrong. got = {}",
+            program.print_string()
+        );
+    }
+}
