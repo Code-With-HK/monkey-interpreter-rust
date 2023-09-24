@@ -1,13 +1,26 @@
 use std::collections::HashMap;
 
 use crate::{
-    ast::{ExpressionNode, Identifier, LetStatement, Program, ReturnStatement, StatementNode},
+    ast::{
+        ExpressionNode, ExpressionStatement, Identifier, LetStatement, Program, ReturnStatement,
+        StatementNode,
+    },
     lexer::Lexer,
     token::{Token, TokenKind},
 };
 
 type PrefixParseFn = fn(parser: &mut Parser) -> Option<ExpressionNode>;
 type InfixParseFn = fn(parser: &mut Parser, exp: ExpressionNode) -> Option<ExpressionNode>;
+
+enum PrecedenceLevel {
+    Lowest = 0,
+    Equals = 1,      // ==
+    LessGreater = 2, // > or <
+    Sum = 3,         // +
+    Product = 4,
+    Prefix = 5,
+    Call = 6,
+}
 
 pub struct Parser {
     lexer: Lexer,
@@ -29,10 +42,19 @@ impl Parser {
             infix_parse_fns: HashMap::new(),
         };
 
+        parser.register_prefix(TokenKind::Ident, Self::parse_identifier);
+
         parser.next_token();
         parser.next_token();
 
         parser
+    }
+
+    fn parse_identifier(&mut self) -> Option<ExpressionNode> {
+        Some(ExpressionNode::IdentifierNode(Identifier {
+            token: self.cur_token.clone(),
+            value: self.cur_token.literal.clone(),
+        }))
     }
 
     fn next_token(&mut self) {
@@ -57,8 +79,32 @@ impl Parser {
         match self.cur_token.kind {
             TokenKind::Let => self.parse_let_statement(),
             TokenKind::Return => self.parse_return_statement(),
-            _ => None,
+            _ => self.parse_expression_statement(),
         }
+    }
+
+    fn parse_expression_statement(&mut self) -> Option<StatementNode> {
+        let stmt = ExpressionStatement {
+            token: self.cur_token.clone(),
+            expression: self.parse_expression(PrecedenceLevel::Lowest),
+        };
+
+        // 5 + 5, 5 + 5;
+        if self.peek_token_is(TokenKind::Semicolon) {
+            self.next_token();
+        }
+
+        Some(StatementNode::Expression(stmt))
+    }
+
+    fn parse_expression(&mut self, precedence_level: PrecedenceLevel) -> Option<ExpressionNode> {
+        let prefix = self.prefix_parse_fns.get(&self.cur_token.kind);
+        if let Some(prefix_fn) = prefix {
+            let left_exp = prefix_fn(self);
+
+            return left_exp;
+        }
+        None
     }
 
     fn parse_let_statement(&mut self) -> Option<StatementNode> {
@@ -144,7 +190,7 @@ impl Parser {
 #[cfg(test)]
 mod test {
     use crate::{
-        ast::{Node, StatementNode},
+        ast::{ExpressionNode, Identifier, Node, StatementNode},
         lexer::Lexer,
     };
 
@@ -220,6 +266,50 @@ mod test {
                 }
             }
             None => panic!("parse program should not be none"),
+        }
+    }
+
+    #[test]
+    fn test_identifier_expression() {
+        let input = "foobar;";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program().unwrap();
+        check_parser_errors(parser);
+
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "program.statements does not contain enough statements. got={}",
+            program.statements.len()
+        );
+
+        match &program.statements[0] {
+            StatementNode::Expression(exp_stmt) => {
+                assert!(exp_stmt.expression.is_some());
+
+                match exp_stmt.expression.as_ref().unwrap() {
+                    ExpressionNode::IdentifierNode(identifier) => {
+                        assert_eq!(
+                            identifier.value, "foobar",
+                            "identifier value not `foobar`. got={}",
+                            identifier.value
+                        );
+                        assert_eq!(
+                            identifier.token_literal(),
+                            "foobar",
+                            "identifier.token_literal() is not `foobar`. got={}",
+                            identifier.token_literal()
+                        );
+                    } // other => panic!("expression not identifier. got={:?}", other),
+                }
+            }
+            other => panic!(
+                "program.statements[0] is not ExpressionStatement. got={:?}",
+                other
+            ),
         }
     }
 
