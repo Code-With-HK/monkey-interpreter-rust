@@ -9,6 +9,7 @@ pub trait Node {
 pub enum StatementNode {
     Let(LetStatement),
     Return(ReturnStatement),
+    Expression(ExpressionStatement),
 }
 
 impl Node for StatementNode {
@@ -16,6 +17,7 @@ impl Node for StatementNode {
         return match self {
             Self::Let(let_stmt) => let_stmt.token_literal(),
             Self::Return(ret_stmt) => ret_stmt.token_literal(),
+            Self::Expression(expression) => expression.token_literal(),
         };
     }
 
@@ -23,6 +25,7 @@ impl Node for StatementNode {
         return match self {
             Self::Let(let_stmt) => let_stmt.print_string(),
             Self::Return(ret_stmt) => ret_stmt.print_string(),
+            Self::Expression(expression) => expression.print_string(),
         };
     }
 }
@@ -56,6 +59,7 @@ impl Node for Program {
             match &self.statements[0] {
                 StatementNode::Let(let_stmt) => let_stmt.token_literal(),
                 StatementNode::Return(ret_stmt) => ret_stmt.token_literal(),
+                StatementNode::Expression(expression) => expression.token_literal(),
             }
         } else {
             String::from("")
@@ -130,6 +134,36 @@ impl Node for ReturnStatement {
     }
 
     fn print_string(&self) -> String {
-        todo!()
+        let mut out = String::from("");
+
+        out.push_str(self.token_literal().as_str());
+        out.push_str(" ");
+
+        if let Some(ret_value) = &self.ret_value {
+            out.push_str(ret_value.print_string().as_str());
+        }
+
+        out.push_str(";");
+
+        out
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct ExpressionStatement {
+    pub token: Token,
+    pub expression: Option<ExpressionNode>,
+}
+
+impl Node for ExpressionStatement {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        if let Some(expression) = &self.expression {
+            return expression.print_string();
+        }
+        String::from("")
     }
 }
