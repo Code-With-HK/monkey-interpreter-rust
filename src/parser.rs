@@ -410,8 +410,8 @@ impl Parser {
                 None
             } else {
                 self.next_token();
-                // TODO: need to parse expression
-                while !self.cur_token_is(TokenKind::Semicolon) {
+                stmt.value = self.parse_expression(PrecedenceLevel::Lowest);
+                if self.peek_token_is(TokenKind::Semicolon) {
                     self.next_token();
                 }
                 Some(StatementNode::Let(stmt))
@@ -420,13 +420,15 @@ impl Parser {
     }
 
     fn parse_return_statement(&mut self) -> Option<StatementNode> {
-        let stmt = ReturnStatement {
+        let mut stmt = ReturnStatement {
             token: self.cur_token.clone(),
             ret_value: Default::default(),
         };
         self.next_token();
 
-        while !self.cur_token_is(TokenKind::Semicolon) {
+        stmt.ret_value = self.parse_expression(PrecedenceLevel::Lowest);
+
+        if self.peek_token_is(TokenKind::Semicolon) {
             self.next_token();
         }
 
@@ -450,7 +452,7 @@ impl Parser {
         self.cur_token.kind == token_kind
     }
 
-    fn errors(&self) -> &Vec<String> {
+    pub fn errors(&self) -> &Vec<String> {
         &self.errors
     }
 
@@ -493,74 +495,84 @@ mod test {
 
     #[test]
     fn test_let_statements() {
-        let input = r#"
-        let x = 5;
-        let y = 10;
-        let foobar = 838383;
-        "#;
+        let tests: Vec<(&str, &str, Box<dyn any::Any>)> = vec![
+            ("let x = 5;", "x", Box::new(5)),
+            ("let y = true;", "y", Box::new(true)),
+            ("let foobar = y;", "foobar", Box::new("y")),
+        ];
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
-        check_parser_errors(parser);
+        for test in tests {
+            let lexer = Lexer::new(test.0);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(parser);
 
-        match program {
-            Some(program) => {
-                assert_eq!(
-                    program.statements.len(),
-                    3,
-                    "statements does not contain 3 statements. got={}",
-                    program.statements.len()
-                );
+            let program = program.unwrap();
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "statements does not contain 1 statements. got={}",
+                program.statements.len()
+            );
 
-                let expected = vec!["x", "y", "foobar"];
+            let stmt = &program.statements[0];
+            test_let_statement(stmt, test.1);
 
-                for (idx, exp) in expected.into_iter().enumerate() {
-                    let stmt = &program.statements[idx];
-                    test_let_statement(stmt, exp);
-                }
+            match stmt {
+                StatementNode::Let(let_stmt) => test_literal_expression(
+                    let_stmt
+                        .value
+                        .as_ref()
+                        .expect("error parsing value of let statement"),
+                    test.2,
+                ),
+                other => panic!("expected LetStatement. got={:?}", other),
             }
-            None => panic!("parse program should not be none"),
         }
     }
 
     #[test]
     fn test_return_statements() {
-        let input = r#"
-            return 5;
-            return 10;
-            return 993322;
-        "#;
+        let tests: Vec<(&str, Box<dyn any::Any>)> = vec![
+            ("return 5;", Box::new(5)),
+            ("return 10;", Box::new(10)),
+            ("return 993322;", Box::new(993322)),
+        ];
 
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
-        check_parser_errors(parser);
+        for test in tests {
+            let lexer = Lexer::new(test.0);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+            check_parser_errors(parser);
 
-        match program {
-            Some(program) => {
-                assert_eq!(
-                    program.statements.len(),
-                    3,
-                    "statements does not contain 3 statements. got={}",
-                    program.statements.len()
-                );
+            let program = program.unwrap();
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "statements does not contain 1 statements. got={}",
+                program.statements.len()
+            );
 
-                for stmt in program.statements {
-                    match stmt {
-                        StatementNode::Return(ret_stmt) => {
-                            assert_eq!(
-                                ret_stmt.token_literal(),
-                                "return",
-                                "token literal not `return`. got={}",
-                                ret_stmt.token_literal()
-                            );
-                        }
-                        other => panic!("not ReturnStatement. got={:?}", other),
-                    }
+            let stmt = &program.statements[0];
+
+            match stmt {
+                StatementNode::Return(ret_stmt) => {
+                    assert_eq!(
+                        ret_stmt.token_literal(),
+                        "return",
+                        "token literal not `return`, got={}",
+                        ret_stmt.token_literal()
+                    );
+                    test_literal_expression(
+                        ret_stmt
+                            .ret_value
+                            .as_ref()
+                            .expect("error parsing value of let statement"),
+                        test.1,
+                    );
                 }
+                other => panic!("expected ReturnStatement. got={:?}", other),
             }
-            None => panic!("parse program should not be none"),
         }
     }
 
