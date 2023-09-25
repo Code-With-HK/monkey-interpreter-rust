@@ -444,6 +444,59 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_parsing_infix_expressions() {
+        let infix_tests = vec![
+            ("5 + 5;", 5, "+", 5),
+            ("5 - 5;", 5, "-", 5),
+            ("5 * 5;", 5, "*", 5),
+            ("5 / 5;", 5, "/", 5),
+            ("5 > 5;", 5, ">", 5),
+            ("5 < 5;", 5, "<", 5),
+            ("5 == 5;", 5, "==", 5),
+            ("5 != 5;", 5, "!=", 5),
+        ];
+
+        for test in infix_tests {
+            let lexer = Lexer::new(test.0);
+            let mut parser = Parser::new(lexer);
+
+            let program = parser.parse_program().unwrap();
+            check_parser_errors(parser);
+
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "program.statements does not contain enough statements. got={}",
+                program.statements.len()
+            );
+
+            match &program.statements[0] {
+                StatementNode::Expression(exp_stmt) => {
+                    assert!(exp_stmt.expression.is_some());
+                    let exp = exp_stmt.expression.as_ref().unwrap();
+
+                    match exp {
+                        ExpressionNode::Infix(infix_exp) => {
+                            test_integer_literal(&infix_exp.left, test.1);
+                            assert_eq!(
+                                infix_exp.operator, test.2,
+                                "prefix_exp.operator not {}. got={}",
+                                test.1, infix_exp.operator
+                            );
+                            test_integer_literal(&infix_exp.right, test.3);
+                        }
+                        other => panic!("exp not InfixExpression. got={:?}", other),
+                    }
+                }
+                other => panic!(
+                    "program.statements[0] is not ExpressionStatement. got={:?}",
+                    other
+                ),
+            }
+        }
+    }
+
     fn test_let_statement(stmt: &StatementNode, expected: &str) {
         assert_eq!(
             stmt.token_literal(),
