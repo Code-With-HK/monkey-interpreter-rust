@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        BlockStatement, Boolean, ExpressionNode, ExpressionStatement, Identifier, IfExpression,
-        InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program, ReturnStatement,
-        StatementNode,
+        BlockStatement, Boolean, ExpressionNode, ExpressionStatement, FunctionLiteral, Identifier,
+        IfExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program,
+        ReturnStatement, StatementNode,
     },
     lexer::Lexer,
     token::{Token, TokenKind},
@@ -66,6 +66,7 @@ impl Parser {
         parser.register_prefix(TokenKind::False, Self::parse_boolean);
         parser.register_prefix(TokenKind::Lparen, Self::parse_grouped_expression);
         parser.register_prefix(TokenKind::If, Self::parse_if_expression);
+        parser.register_prefix(TokenKind::Function, Self::parse_function_literal);
 
         parser.register_infix(TokenKind::Plus, Self::parse_infix_expression);
         parser.register_infix(TokenKind::Minus, Self::parse_infix_expression);
@@ -181,6 +182,64 @@ impl Parser {
         }
 
         Some(ExpressionNode::IfExpressionNode(expression))
+    }
+
+    fn parse_function_literal(&mut self) -> Option<ExpressionNode> {
+        let mut literal = FunctionLiteral {
+            token: self.cur_token.clone(),
+            body: Default::default(),
+            parameters: vec![],
+        };
+
+        if !self.expect_peek(TokenKind::Lparen) {
+            return None;
+        }
+
+        literal.parameters = self
+            .parse_function_parameters()
+            .expect("error parsing parameters");
+
+        if !self.expect_peek(TokenKind::Lbrace) {
+            return None;
+        }
+
+        literal.body = self.parse_block_statement();
+
+        Some(ExpressionNode::Function(literal))
+    }
+
+    fn parse_function_parameters(&mut self) -> Option<Vec<Identifier>> {
+        let mut identifiers = vec![];
+
+        if self.peek_token_is(TokenKind::Rparen) {
+            self.next_token();
+            return Some(identifiers);
+        }
+
+        self.next_token();
+
+        let ident = Identifier {
+            token: self.cur_token.clone(),
+            value: self.cur_token.literal.clone(),
+        };
+
+        identifiers.push(ident);
+
+        while self.peek_token_is(TokenKind::Comma) {
+            self.next_token();
+            self.next_token();
+            let ident = Identifier {
+                token: self.cur_token.clone(),
+                value: self.cur_token.literal.clone(),
+            };
+            identifiers.push(ident);
+        }
+
+        if !self.expect_peek(TokenKind::Rparen) {
+            return None;
+        }
+
+        Some(identifiers)
     }
 
     fn parse_block_statement(&mut self) -> BlockStatement {
@@ -862,6 +921,130 @@ mod test {
                 other => panic!("Expression is not IfExpression. got={:?}", other),
             },
             other => panic!("statement is not an ExpressionStatement. got={:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_function_literal_parsing() {
+        let input = "fn(x, y) { x + y; }";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program().unwrap();
+        check_parser_errors(parser);
+
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "statements does not contain 1 statements, got={}",
+            program.statements.len()
+        );
+
+        match &program.statements[0] {
+            StatementNode::Expression(exp_stmt) => match exp_stmt.expression.as_ref().unwrap() {
+                ExpressionNode::Function(fn_lit) => {
+                    assert_eq!(
+                        fn_lit.parameters.len(),
+                        2,
+                        "function literal parameters wrong. Expected 2 got={}",
+                        fn_lit.parameters.len()
+                    );
+
+                    match &fn_lit.parameters[0] {
+                        Identifier { token, value } => {
+                            assert_eq!(value, "x", "parameter wrong. Expected `x` got={}", value);
+                            assert_eq!(
+                                token.literal, "x",
+                                "parameter wrong. Expected `x` got={}",
+                                token.literal
+                            );
+                        }
+                    }
+
+                    match &fn_lit.parameters[1] {
+                        Identifier { token, value } => {
+                            assert_eq!(value, "y", "parameter wrong. Expected `y` got={}", value);
+                            assert_eq!(
+                                token.literal, "y",
+                                "parameter wrong. Expected `y` got={}",
+                                token.literal
+                            );
+                        }
+                    }
+
+                    assert_eq!(
+                        fn_lit.body.statements.len(),
+                        1,
+                        "function body statements wrong. Expected 2 got={}",
+                        fn_lit.body.statements.len()
+                    );
+
+                    match &fn_lit.body.statements[0] {
+                        StatementNode::Expression(exp) => test_infix_expression(
+                            exp.expression.as_ref().unwrap(),
+                            Box::new("x"),
+                            String::from("+"),
+                            Box::new("y"),
+                        ),
+                        other => panic!(
+                            "function body statement is not ExpressionStatement. got={:?}",
+                            other
+                        ),
+                    }
+                }
+                other => panic!("Expression is not FunctionLiteral. got={:?}", other),
+            },
+            other => panic!("statement is not an ExpressionStatement. got={:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_function_parameter_parsing() {
+        let tests = vec![
+            ("fn() {};", vec![]),
+            ("fn(x) {};", vec!["x"]),
+            ("fn(x, y, z) {};", vec!["x", "y", "z"]),
+        ];
+
+        for test in tests {
+            let lexer = Lexer::new(test.0);
+            let mut parser = Parser::new(lexer);
+
+            let program = parser.parse_program().unwrap();
+            check_parser_errors(parser);
+
+            match &program.statements[0] {
+                StatementNode::Expression(exp_stmt) => {
+                    match exp_stmt.expression.as_ref().unwrap() {
+                        ExpressionNode::Function(fn_lit) => {
+                            assert_eq!(
+                                fn_lit.parameters.len(),
+                                test.1.len(),
+                                "function literal parameters wrong. Expected 2 got={}",
+                                fn_lit.parameters.len()
+                            );
+
+                            for (idx, ident) in test.1.into_iter().enumerate() {
+                                assert_eq!(
+                                    fn_lit.parameters[idx].value, ident,
+                                    "expected {}, got {}",
+                                    ident, fn_lit.parameters[idx].value
+                                );
+                                assert_eq!(
+                                    fn_lit.parameters[idx].token_literal(),
+                                    ident,
+                                    "expected {}, got {}",
+                                    ident,
+                                    fn_lit.parameters[idx].token_literal()
+                                );
+                            }
+                        }
+                        other => panic!("Expression is not FunctionLiteral. got={:?}", other),
+                    }
+                }
+                other => panic!("statement is not an ExpressionStatement. got={:?}", other),
+            }
         }
     }
 
