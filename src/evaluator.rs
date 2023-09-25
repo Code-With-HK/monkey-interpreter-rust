@@ -38,10 +38,62 @@ impl Evaluator {
                 ExpressionNode::BooleanNode(bool) => {
                     Self::native_bool_to_boolean_object(bool.value)
                 }
+                ExpressionNode::Prefix(prefix_exp) => {
+                    let right = self.eval_expression(Some(*prefix_exp.right));
+                    return Self::eval_prefix_expression(prefix_exp.operator, right);
+                }
+                ExpressionNode::Infix(infix_exp) => {
+                    let left = self.eval_expression(Some(*infix_exp.left));
+                    let right = self.eval_expression(Some(*infix_exp.right));
+                    return Self::eval_infix_expression(infix_exp.operator, &left, &right);
+                }
                 _ => Object::Null,
             };
         }
         Object::Null
+    }
+
+    fn eval_prefix_expression(operator: String, right: Object) -> Object {
+        match operator.as_str() {
+            "!" => Self::eval_bang_operator_expression(right),
+            "-" => Self::eval_minus_prefix_operator_expression(right),
+            _ => NULL,
+        }
+    }
+
+    fn eval_infix_expression(operator: String, left: &Object, right: &Object) -> Object {
+        match (left, right, operator) {
+            (Object::Integer(left), Object::Integer(right), op) => {
+                Self::eval_integer_infix_expression(op, *left, *right)
+            }
+            _ => NULL,
+        }
+    }
+
+    fn eval_integer_infix_expression(operator: String, left: i64, right: i64) -> Object {
+        match operator.as_str() {
+            "+" => Object::Integer(left + right),
+            "-" => Object::Integer(left - right),
+            "*" => Object::Integer(left * right),
+            "/" => Object::Integer(left / right),
+            _ => NULL,
+        }
+    }
+
+    fn eval_bang_operator_expression(right: Object) -> Object {
+        match right {
+            Object::Boolean(true) => FALSE,
+            Object::Boolean(false) => TRUE,
+            Object::Null => TRUE,
+            _ => FALSE,
+        }
+    }
+
+    fn eval_minus_prefix_operator_expression(right: Object) -> Object {
+        match right {
+            Object::Integer(int) => Object::Integer(-int),
+            _ => NULL,
+        }
     }
 
     fn native_bool_to_boolean_object(bool: bool) -> Object {
@@ -61,7 +113,23 @@ mod test {
 
     #[test]
     fn test_eval_integer_expression() {
-        let tests = vec![("5", 5), ("10", 10)];
+        let tests = vec![
+            ("5", 5),
+            ("10", 10),
+            ("-5", -5),
+            ("-10", -10),
+            ("5 + 5 + 5 + 5 - 10", 10),
+            ("2 * 2 * 2 * 2 * 2", 32),
+            ("-50 + 100 + -50", 0),
+            ("5 * 2 + 10", 20),
+            ("5 + 2 * 10", 25),
+            ("20 + 2 * -10", 0),
+            ("50 / 2 * 2 + 10", 60),
+            ("2 * (5 + 10)", 30),
+            ("3 * 3 * 3 + 10", 37),
+            ("3 * (3 * 3) + 10", 37),
+            ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
+        ];
 
         for test in tests {
             let evaluated = test_eval(test.0);
@@ -72,6 +140,23 @@ mod test {
     #[test]
     fn test_eval_boolean_expression() {
         let tests = vec![("true", true), ("false", false)];
+
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            test_boolean_object(evaluated, test.1);
+        }
+    }
+
+    #[test]
+    fn test_bang_operator() {
+        let tests = vec![
+            ("!true", false),
+            ("!false", true),
+            ("!5", false),
+            ("!!true", true),
+            ("!!false", false),
+            ("!!5", true),
+        ];
 
         for test in tests {
             let evaluated = test_eval(test.0);
