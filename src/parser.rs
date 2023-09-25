@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        ExpressionNode, ExpressionStatement, Identifier, IntegerLiteral, LetStatement, Program,
-        ReturnStatement, StatementNode,
+        ExpressionNode, ExpressionStatement, Identifier, IntegerLiteral, LetStatement,
+        PrefixExpression, Program, ReturnStatement, StatementNode,
     },
     lexer::Lexer,
     token::{Token, TokenKind},
@@ -44,6 +44,8 @@ impl Parser {
 
         parser.register_prefix(TokenKind::Ident, Self::parse_identifier);
         parser.register_prefix(TokenKind::Int, Self::parse_integer_literal);
+        parser.register_prefix(TokenKind::Bang, Self::parse_prefix_expression);
+        parser.register_prefix(TokenKind::Minus, Self::parse_prefix_expression);
 
         parser.next_token();
         parser.next_token();
@@ -75,6 +77,21 @@ impl Parser {
                 None
             }
         };
+    }
+
+    fn parse_prefix_expression(&mut self) -> Option<ExpressionNode> {
+        let mut expression = PrefixExpression {
+            token: self.cur_token.clone(),
+            operator: self.cur_token.literal.clone(),
+            right: Default::default(),
+        };
+        self.next_token();
+        match self.parse_expression(PrecedenceLevel::Prefix) {
+            Some(exp) => expression.right = Box::new(exp),
+            None => return None,
+        }
+
+        Some(ExpressionNode::Prefix(expression))
     }
 
     fn next_token(&mut self) {
@@ -124,7 +141,13 @@ impl Parser {
 
             return left_exp;
         }
+        self.no_prefix_parse_fn_error(self.cur_token.kind.clone());
         None
+    }
+
+    fn no_prefix_parse_fn_error(&mut self, token_kind: TokenKind) {
+        let msg = format!("no prefix parse function for {} found", token_kind);
+        self.errors.push(msg)
     }
 
     fn parse_let_statement(&mut self) -> Option<StatementNode> {
