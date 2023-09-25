@@ -1,5 +1,5 @@
 use crate::{
-    ast::{ExpressionNode, Program, StatementNode},
+    ast::{BlockStatement, ExpressionNode, IfExpression, Program, StatementNode},
     object::Object,
 };
 
@@ -47,6 +47,7 @@ impl Evaluator {
                     let right = self.eval_expression(Some(*infix_exp.right));
                     return Self::eval_infix_expression(infix_exp.operator, &left, &right);
                 }
+                ExpressionNode::IfExpressionNode(if_exp) => self.eval_if_expression(if_exp),
                 _ => Object::Null,
             };
         }
@@ -88,6 +89,37 @@ impl Evaluator {
             "==" => Self::native_bool_to_boolean_object(left == right),
             "!=" => Self::native_bool_to_boolean_object(left != right),
             _ => NULL,
+        }
+    }
+
+    fn eval_if_expression(&self, exp: IfExpression) -> Object {
+        let condition = self.eval_expression(Some(*exp.condition));
+
+        return if Self::is_truthy(condition) {
+            self.eval_block_statement(exp.consequence)
+        } else if let Some(alt) = exp.alternative {
+            self.eval_block_statement(alt)
+        } else {
+            NULL
+        };
+    }
+
+    fn eval_block_statement(&self, block: BlockStatement) -> Object {
+        let mut result = NULL;
+
+        for stmt in block.statements {
+            result = self.eval_statement(stmt);
+        }
+
+        result
+    }
+
+    fn is_truthy(obj: Object) -> bool {
+        match obj {
+            Object::Null => false,
+            Object::Boolean(true) => true,
+            Object::Boolean(false) => false,
+            _ => true,
         }
     }
 
