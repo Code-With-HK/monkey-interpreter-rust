@@ -63,6 +63,7 @@ impl Parser {
         parser.register_prefix(TokenKind::Minus, Self::parse_prefix_expression);
         parser.register_prefix(TokenKind::True, Self::parse_boolean);
         parser.register_prefix(TokenKind::False, Self::parse_boolean);
+        parser.register_prefix(TokenKind::Lparen, Self::parse_grouped_expression);
 
         parser.register_infix(TokenKind::Plus, Self::parse_infix_expression);
         parser.register_infix(TokenKind::Minus, Self::parse_infix_expression);
@@ -125,6 +126,18 @@ impl Parser {
             token: self.cur_token.clone(),
             value: self.cur_token_is(TokenKind::True),
         }))
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<ExpressionNode> {
+        self.next_token();
+
+        let exp = self.parse_expression(PrecedenceLevel::Lowest);
+
+        if !self.expect_peek(TokenKind::Rparen) {
+            return None;
+        }
+
+        exp
     }
 
     fn parse_infix_expression(&mut self, left: ExpressionNode) -> Option<ExpressionNode> {
@@ -595,6 +608,11 @@ mod test {
             ("false", "false"),
             ("3 > 5 == false", "((3 > 5) == false)"),
             ("3 < 5 == true", "((3 < 5) == true)"),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
 
         for test in tests {
