@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     ast::{
-        BlockStatement, Boolean, ExpressionNode, ExpressionStatement, FunctionLiteral, Identifier,
-        IfExpression, InfixExpression, IntegerLiteral, LetStatement, PrefixExpression, Program,
-        ReturnStatement, StatementNode,
+        BlockStatement, Boolean, CallExpression, ExpressionNode, ExpressionStatement,
+        FunctionLiteral, Identifier, IfExpression, InfixExpression, IntegerLiteral, LetStatement,
+        PrefixExpression, Program, ReturnStatement, StatementNode,
     },
     lexer::Lexer,
     token::{Token, TokenKind},
@@ -34,6 +34,7 @@ fn precedence_map(kind: &TokenKind) -> PrecedenceLevel {
         TokenKind::Minus => PrecedenceLevel::Sum,
         TokenKind::Slash => PrecedenceLevel::Product,
         TokenKind::Asterisk => PrecedenceLevel::Product,
+        TokenKind::Lparen => PrecedenceLevel::Call,
         _ => PrecedenceLevel::Lowest,
     };
 }
@@ -76,6 +77,7 @@ impl Parser {
         parser.register_infix(TokenKind::NotEq, Self::parse_infix_expression);
         parser.register_infix(TokenKind::Lt, Self::parse_infix_expression);
         parser.register_infix(TokenKind::Gt, Self::parse_infix_expression);
+        parser.register_infix(TokenKind::Lparen, Self::parse_call_expression);
 
         parser.next_token();
         parser.next_token();
@@ -278,6 +280,51 @@ impl Parser {
         }
 
         Some(ExpressionNode::Infix(expression))
+    }
+
+    fn parse_call_expression(&mut self, function: ExpressionNode) -> Option<ExpressionNode> {
+        self.next_token();
+        let mut exp = CallExpression {
+            token: self.cur_token.clone(),
+            function: Box::new(function),
+            arguments: vec![],
+        };
+
+        exp.arguments = self
+            .parse_call_arguments()
+            .expect("error parsing arguments");
+
+        Some(ExpressionNode::Call(exp))
+    }
+
+    fn parse_call_arguments(&mut self) -> Option<Vec<ExpressionNode>> {
+        let mut args = vec![];
+
+        if self.peek_token_is(TokenKind::Rparen) {
+            self.next_token();
+            return Some(args);
+        }
+
+        self.next_token();
+        args.push(
+            self.parse_expression(PrecedenceLevel::Lowest)
+                .expect("error parsing arguments"),
+        );
+
+        while self.peek_token_is(TokenKind::Comma) {
+            self.next_token();
+            self.next_token();
+            args.push(
+                self.parse_expression(PrecedenceLevel::Lowest)
+                    .expect("error parsing arguments"),
+            )
+        }
+
+        if !self.expect_peek(TokenKind::Rparen) {
+            return None;
+        }
+
+        Some(args)
     }
 
     fn next_token(&mut self) {
@@ -735,6 +782,15 @@ mod test {
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
+            ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            (
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            (
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
         ];
 
         for test in tests {
@@ -1045,6 +1101,53 @@ mod test {
                 }
                 other => panic!("statement is not an ExpressionStatement. got={:?}", other),
             }
+        }
+    }
+
+    #[test]
+    fn test_call_expression_parsing() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program().unwrap();
+        check_parser_errors(parser);
+
+        assert_eq!(
+            program.statements.len(),
+            1,
+            "statements does not contain 1 statements, got={}",
+            program.statements.len()
+        );
+
+        match &program.statements[0] {
+            StatementNode::Expression(exp_stmt) => match exp_stmt.expression.as_ref().unwrap() {
+                ExpressionNode::Call(call_exp) => {
+                    test_identifier(&call_exp.function, String::from("add"));
+                    assert_eq!(
+                        call_exp.arguments.len(),
+                        3,
+                        "wrong length of arguments. got={}",
+                        call_exp.arguments.len()
+                    );
+                    test_literal_expression(&call_exp.arguments[0], Box::new(1));
+                    test_infix_expression(
+                        &call_exp.arguments[1],
+                        Box::new(2),
+                        String::from("*"),
+                        Box::new(3),
+                    );
+                    test_infix_expression(
+                        &call_exp.arguments[2],
+                        Box::new(4),
+                        String::from("+"),
+                        Box::new(5),
+                    );
+                }
+                other => panic!("Expression is not FunctionLiteral. got={:?}", other),
+            },
+            other => panic!("statement is not an ExpressionStatement. got={:?}", other),
         }
     }
 
