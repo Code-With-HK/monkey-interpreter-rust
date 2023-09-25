@@ -378,6 +378,49 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_parsing_prefix_expressions() {
+        let prefix_tests = vec![("!5", "!", 5), ("-15", "-", 15)];
+
+        for test in prefix_tests {
+            let lexer = Lexer::new(test.0);
+            let mut parser = Parser::new(lexer);
+
+            let program = parser.parse_program().unwrap();
+            check_parser_errors(parser);
+
+            assert_eq!(
+                program.statements.len(),
+                1,
+                "program.statements does not contain enough statements. got={}",
+                program.statements.len()
+            );
+
+            match &program.statements[0] {
+                StatementNode::Expression(exp_stmt) => {
+                    assert!(exp_stmt.expression.is_some());
+                    let exp = exp_stmt.expression.as_ref().unwrap();
+
+                    match exp {
+                        ExpressionNode::Prefix(prefix_exp) => {
+                            assert_eq!(
+                                prefix_exp.operator, test.1,
+                                "prefix_exp.operator not {}. got={}",
+                                test.1, prefix_exp.operator
+                            );
+                            test_integer_literal(&prefix_exp.right, test.2);
+                        }
+                        other => panic!("exp not PrefixExpression. got={:?}", other),
+                    }
+                }
+                other => panic!(
+                    "program.statements[0] is not ExpressionStatement. got={:?}",
+                    other
+                ),
+            }
+        }
+    }
+
     fn test_let_statement(stmt: &StatementNode, expected: &str) {
         assert_eq!(
             stmt.token_literal(),
@@ -416,5 +459,25 @@ mod test {
         }
 
         panic!("parser error present");
+    }
+
+    fn test_integer_literal(exp: &ExpressionNode, value: i64) {
+        match exp {
+            ExpressionNode::Integer(int_exp) => {
+                assert_eq!(
+                    int_exp.value, value,
+                    "int_exp.value not {}, got={}",
+                    value, int_exp.value
+                );
+                assert_eq!(
+                    int_exp.token_literal(),
+                    format!("{}", value),
+                    "int_exp.token_literal() not {}, got={}",
+                    value,
+                    int_exp.token_literal()
+                );
+            }
+            other => panic!("exp not IntegerLiteral. got={:?}", other),
+        }
     }
 }
