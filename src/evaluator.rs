@@ -195,6 +195,35 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_if_else_expression() {
+        let tests = vec![
+            ("if (true) { 10 }", 10),
+            ("if (false) { 10 }", -999),
+            ("if (1) { 10 }", 10),
+            ("if (1 < 2) { 10 }", 10),
+            ("if (1 > 2) { 10 }", -999),
+            ("if (1 > 2) { 10 } else { 20 }", 20),
+            ("if (1 < 2) { 10 } else { 20 }", 10),
+        ];
+
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            if test.1 == -999 {
+                test_null_object(evaluated);
+            } else {
+                test_integer_object(evaluated, test.1);
+            }
+        }
+    }
+
+    fn test_null_object(obj: Object) {
+        match obj {
+            Object::Null => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
     fn test_eval(input: &str) -> Object {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
