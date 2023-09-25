@@ -3,6 +3,10 @@ use crate::{
     object::Object,
 };
 
+const TRUE: Object = Object::Boolean(true);
+const FALSE: Object = Object::Boolean(false);
+const NULL: Object = Object::Null;
+
 pub struct Evaluator {}
 
 impl Evaluator {
@@ -31,10 +35,21 @@ impl Evaluator {
         if let Some(exp) = expression {
             return match exp {
                 ExpressionNode::Integer(int) => Object::Integer(int.value),
+                ExpressionNode::BooleanNode(bool) => {
+                    Self::native_bool_to_boolean_object(bool.value)
+                }
                 _ => Object::Null,
             };
         }
         Object::Null
+    }
+
+    fn native_bool_to_boolean_object(bool: bool) -> Object {
+        if bool {
+            TRUE
+        } else {
+            FALSE
+        }
     }
 }
 
@@ -54,6 +69,16 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_eval_boolean_expression() {
+        let tests = vec![("true", true), ("false", false)];
+
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            test_boolean_object(evaluated, test.1);
+        }
+    }
+
     fn test_eval(input: &str) -> Object {
         let lexer = Lexer::new(input);
         let mut parser = Parser::new(lexer);
@@ -70,6 +95,17 @@ mod test {
                 int, expected
             ),
             other => panic!("object is not integer. got={:?}", other),
+        }
+    }
+
+    fn test_boolean_object(obj: Object, expected: bool) {
+        match obj {
+            Object::Boolean(bool) => assert_eq!(
+                bool, expected,
+                "object has wrong value. got={}, want={}",
+                bool, expected
+            ),
+            other => panic!("object is not bool. got={}", other),
         }
     }
 }
