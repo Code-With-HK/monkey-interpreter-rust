@@ -19,6 +19,10 @@ impl Evaluator {
 
         for stmt in program.statements {
             result = self.eval_statement(stmt);
+
+            if let Object::ReturnValue(ret) = result {
+                return *ret;
+            }
         }
 
         result
@@ -27,6 +31,10 @@ impl Evaluator {
     fn eval_statement(&self, stmt: StatementNode) -> Object {
         match stmt {
             StatementNode::Expression(exp_stmt) => self.eval_expression(exp_stmt.expression),
+            StatementNode::Return(ret_stmt) => {
+                let value = self.eval_expression(ret_stmt.ret_value);
+                return Object::ReturnValue(Box::new(value));
+            }
             _ => Object::Null,
         }
     }
@@ -109,6 +117,10 @@ impl Evaluator {
 
         for stmt in block.statements {
             result = self.eval_statement(stmt);
+
+            if result.object_type() == "RETURN_VALUE" {
+                return result;
+            }
         }
 
         result
@@ -246,6 +258,30 @@ mod test {
             } else {
                 test_integer_object(evaluated, test.1);
             }
+        }
+    }
+
+    #[test]
+    fn test_return_statements() {
+        let tests = vec![
+            ("return 10", 10),
+            ("return 10; 9;", 10),
+            ("return 2 * 5; 9;", 10),
+            ("9; return 2 * 5; 9;", 10),
+            (
+                "if (10 > 1) {
+                if (10 > 1) {
+                    return 10;
+                }
+                return 1;
+            }",
+                10,
+            ),
+        ];
+
+        for test in tests {
+            let evaluated = test_eval(test.0);
+            test_integer_object(evaluated, test.1);
         }
     }
 
