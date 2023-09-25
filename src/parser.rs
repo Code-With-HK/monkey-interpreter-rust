@@ -290,6 +290,8 @@ impl Parser {
 
 #[cfg(test)]
 mod test {
+    use std::any;
+
     use crate::{
         ast::{ExpressionNode, Identifier, Node, StatementNode},
         lexer::Lexer,
@@ -504,7 +506,7 @@ mod test {
 
     #[test]
     fn test_parsing_infix_expressions() {
-        let infix_tests = vec![
+        let infix_tests: Vec<(&str, i64, &str, i64)> = vec![
             ("5 + 5;", 5, "+", 5),
             ("5 - 5;", 5, "-", 5),
             ("5 * 5;", 5, "*", 5),
@@ -534,18 +536,12 @@ mod test {
                     assert!(exp_stmt.expression.is_some());
                     let exp = exp_stmt.expression.as_ref().unwrap();
 
-                    match exp {
-                        ExpressionNode::Infix(infix_exp) => {
-                            test_integer_literal(&infix_exp.left, test.1);
-                            assert_eq!(
-                                infix_exp.operator, test.2,
-                                "prefix_exp.operator not {}. got={}",
-                                test.1, infix_exp.operator
-                            );
-                            test_integer_literal(&infix_exp.right, test.3);
-                        }
-                        other => panic!("exp not InfixExpression. got={:?}", other),
-                    }
+                    test_infix_expression(
+                        exp,
+                        Box::new(test.1),
+                        test.2.to_string(),
+                        Box::new(test.3),
+                    )
                 }
                 other => panic!(
                     "program.statements[0] is not ExpressionStatement. got={:?}",
@@ -648,6 +644,56 @@ mod test {
                 );
             }
             other => panic!("exp not IntegerLiteral. got={:?}", other),
+        }
+    }
+
+    fn test_identifier(exp: &ExpressionNode, value: String) {
+        match exp {
+            ExpressionNode::IdentifierNode(identifier_exp) => {
+                assert_eq!(
+                    identifier_exp.value, value,
+                    "identifier_exp.value not {}, got={}",
+                    value, identifier_exp.value
+                );
+                assert_eq!(
+                    identifier_exp.token_literal(),
+                    value,
+                    "identifier_exp.token_literal not {}, got={}",
+                    value,
+                    identifier_exp.token_literal()
+                );
+            }
+            other => panic!("exp not Identifier. got={:?}", other),
+        }
+    }
+
+    fn test_literal_expression(exp: &ExpressionNode, expected: Box<dyn any::Any>) {
+        match expected.downcast_ref::<String>() {
+            Some(exp_string) => test_identifier(exp, exp_string.to_string()),
+            None => match expected.downcast_ref::<i64>() {
+                Some(int_exp) => test_integer_literal(exp, int_exp.to_owned()),
+                None => panic!("should not happen"),
+            },
+        }
+    }
+
+    fn test_infix_expression(
+        exp: &ExpressionNode,
+        left: Box<dyn any::Any>,
+        operator: String,
+        right: Box<dyn any::Any>,
+    ) {
+        match exp {
+            ExpressionNode::Infix(infix_exp) => {
+                test_literal_expression(&infix_exp.left, left);
+                assert_eq!(
+                    infix_exp.operator, operator,
+                    "operator is not {}. got={}",
+                    operator, infix_exp.operator
+                );
+                test_literal_expression(&infix_exp.right, right);
+            }
+            other => panic!("exp is not InfixExpression. got={:?}", other),
         }
     }
 }
