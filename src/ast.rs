@@ -38,6 +38,7 @@ pub enum ExpressionNode {
     Integer(IntegerLiteral),
     Prefix(PrefixExpression),
     Infix(InfixExpression),
+    BooleanNode(Boolean),
 }
 
 impl Node for ExpressionNode {
@@ -47,6 +48,7 @@ impl Node for ExpressionNode {
             Self::Integer(integer) => integer.token_literal(),
             Self::Prefix(prefix_exp) => prefix_exp.token_literal(),
             Self::Infix(infix_exp) => infix_exp.token_literal(),
+            Self::BooleanNode(bool_exp) => bool_exp.token_literal(),
             Self::None => String::from(""),
         };
     }
@@ -57,6 +59,7 @@ impl Node for ExpressionNode {
             Self::Integer(integer) => integer.print_string(),
             Self::Prefix(prefix_exp) => prefix_exp.print_string(),
             Self::Infix(infix_exp) => infix_exp.print_string(),
+            Self::BooleanNode(bool_exp) => bool_exp.print_string(),
             Self::None => String::from(""),
         };
     }
@@ -217,6 +220,22 @@ impl Node for PrefixExpression {
         out.push_str(")");
 
         out
+    }
+}
+
+#[derive(Debug)]
+pub struct Boolean {
+    pub token: Token,
+    pub value: bool,
+}
+
+impl Node for Boolean {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        self.token_literal()
     }
 }
 
