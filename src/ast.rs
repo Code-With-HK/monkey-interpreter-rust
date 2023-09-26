@@ -45,6 +45,7 @@ pub enum ExpressionNode {
     IfExpressionNode(IfExpression),
     Function(FunctionLiteral),
     Call(CallExpression),
+    StringExp(StringLiteral),
 }
 
 impl Node for ExpressionNode {
@@ -58,6 +59,7 @@ impl Node for ExpressionNode {
             Self::IfExpressionNode(if_exp) => if_exp.token_literal(),
             Self::Function(func_literal) => func_literal.token_literal(),
             Self::Call(call_exp) => call_exp.token_literal(),
+            Self::StringExp(string) => string.token_literal(),
             Self::None => String::from(""),
         };
     }
@@ -72,6 +74,7 @@ impl Node for ExpressionNode {
             Self::IfExpressionNode(if_exp) => if_exp.print_string(),
             Self::Function(func_literal) => func_literal.print_string(),
             Self::Call(call_exp) => call_exp.print_string(),
+            Self::StringExp(string) => string.print_string(),
             Self::None => String::from(""),
         };
     }
@@ -385,6 +388,22 @@ impl Node for BlockStatement {
         }
 
         out
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StringLiteral {
+    pub token: Token,
+    pub value: String,
+}
+
+impl Node for StringLiteral {
+    fn token_literal(&self) -> String {
+        self.token.literal.clone()
+    }
+
+    fn print_string(&self) -> String {
+        self.token_literal()
     }
 }
 
