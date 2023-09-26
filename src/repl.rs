@@ -3,7 +3,7 @@ use std::io::{Stdin, Stdout, Write};
 use crate::{evaluator::Evaluator, lexer::Lexer, parser::Parser};
 
 pub fn start(stdin: Stdin, mut stdout: Stdout) {
-    let evaluator = Evaluator::new();
+    let mut evaluator = Evaluator::new();
     loop {
         write!(stdout, ">> ").expect("should have written prompt string >>");
         stdout.flush().expect("should have flushed stdout!");
