@@ -16,6 +16,7 @@ pub enum Object {
     Func(Function),
     StringObj(String),
     Builtin(BuiltinFunction),
+    Array(Vec<Object>),
     Null,
 }
 
@@ -29,6 +30,7 @@ impl Object {
             Self::Func(_) => String::from("FUNCTION"),
             Self::StringObj(_) => String::from("STRING"),
             Self::Builtin(_) => String::from("BUILTIN"),
+            Self::Array(_) => String::from("ARRAY"),
             Self::Null => String::from("NULL"),
         }
     }
@@ -55,6 +57,20 @@ impl Display for Object {
                 out.push_str(") {\n");
                 out.push_str(function.body.print_string().as_str());
                 out.push_str("\n}");
+
+                write!(f, "{}", out)
+            }
+            Self::Array(elements) => {
+                let mut out = String::from("");
+                let mut els = vec![];
+
+                for el in elements {
+                    els.push(format!("{}", el));
+                }
+
+                out.push_str("[");
+                out.push_str(els.join(", ").as_str());
+                out.push_str("]");
 
                 write!(f, "{}", out)
             }
