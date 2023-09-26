@@ -69,7 +69,7 @@ impl Environment {
     }
 
     pub fn new_enclosed_environment(outer: Box<Environment>) -> Environment {
-        let mut env_map = HashMap::new();
+        let env_map = HashMap::new();
         Environment {
             store: env_map,
             outer: Some(outer),

@@ -507,6 +507,20 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_closures() {
+        let input = r#"
+        let newAdder = fn(x) {
+            fn(y) { x + y};
+        };
+
+        let addTwo = newAdder(2);
+        addTwo(2);
+        "#;
+
+        test_integer_object(test_eval(input), 4);
+    }
+
     fn test_null_object(obj: Object) {
         match obj {
             Object::Null => assert!(true),
