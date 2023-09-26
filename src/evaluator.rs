@@ -1,6 +1,6 @@
 use crate::{
     ast::{BlockStatement, ExpressionNode, Identifier, IfExpression, Program, StatementNode},
-    object::{Environment, Object},
+    object::{Environment, Function, Object},
 };
 
 const TRUE: Object = Object::Boolean(true);
@@ -85,6 +85,11 @@ impl Evaluator {
                 }
                 ExpressionNode::IfExpressionNode(if_exp) => self.eval_if_expression(if_exp),
                 ExpressionNode::IdentifierNode(ident) => self.eval_identifier(ident),
+                ExpressionNode::Function(fn_lit) => Object::Func(Function {
+                    parameters: fn_lit.parameters,
+                    body: fn_lit.body,
+                    env: self.env.clone(),
+                }),
                 _ => Object::Null,
             };
         }
@@ -225,7 +230,7 @@ impl Evaluator {
 
 #[cfg(test)]
 mod test {
-    use crate::{lexer::Lexer, object::Object, parser::Parser};
+    use crate::{ast::Node, lexer::Lexer, object::Object, parser::Parser};
 
     use super::Evaluator;
 
@@ -393,6 +398,36 @@ mod test {
 
         for test in tests {
             test_integer_object(test_eval(test.0), test.1);
+        }
+    }
+
+    #[test]
+    fn test_function_object() {
+        let input = "fn(x) { x + 2; }";
+        let evaluated = test_eval(input);
+
+        match evaluated {
+            Object::Func(function) => {
+                assert_eq!(
+                    function.parameters.len(),
+                    1,
+                    "function has wrong parameters length. got={}",
+                    function.parameters.len()
+                );
+                assert_eq!(
+                    function.parameters[0].print_string(),
+                    "x",
+                    "parameter is not `x`, got={}",
+                    function.parameters[0].print_string()
+                );
+                assert_eq!(
+                    function.body.print_string(),
+                    "(x + 2)",
+                    "body is not `(x + 2)`. got={}",
+                    function.body.print_string()
+                );
+            }
+            other => panic!("object is not Function. got={:?}", other),
         }
     }
 
