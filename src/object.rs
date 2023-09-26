@@ -1,6 +1,9 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::ast::{BlockStatement, Identifier, Node};
+use crate::{
+    ast::{BlockStatement, Identifier, Node},
+    builtins::Builtins,
+};
 
 pub type BuiltinFunction = fn(Vec<Object>) -> Object;
 
@@ -70,17 +73,28 @@ pub struct Environment {
 
 impl Environment {
     pub fn new_environment() -> Environment {
+        let mut env_map = HashMap::new();
+        Self::init_builtins(&mut env_map);
         Environment {
-            store: HashMap::new(),
+            store: env_map,
             outer: None,
         }
     }
 
     pub fn new_enclosed_environment(outer: Box<Environment>) -> Environment {
-        let env_map = HashMap::new();
+        let mut env_map = HashMap::new();
+        Self::init_builtins(&mut env_map);
         Environment {
             store: env_map,
             outer: Some(outer),
+        }
+    }
+
+    fn init_builtins(hashmap: &mut HashMap<String, Object>) {
+        let builtins_functions = Builtins;
+        let builtins = builtins_functions.all_builtins();
+        for (name, object) in builtins {
+            hashmap.insert(name, object);
         }
     }
 

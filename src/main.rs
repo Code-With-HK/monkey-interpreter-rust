@@ -3,6 +3,7 @@ use std::io;
 use crate::repl::start;
 
 pub mod ast;
+pub mod builtins;
 pub mod evaluator;
 pub mod lexer;
 pub mod object;
