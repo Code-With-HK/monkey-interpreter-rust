@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::token::Token;
 
 pub trait Node {
@@ -473,7 +471,7 @@ impl Node for IndexExpression {
 #[derive(Debug, Clone)]
 pub struct HashLiteral {
     pub token: Token, // {
-    pub pairs: HashMap<ExpressionNode, ExpressionNode>,
+    pub pairs: Vec<(ExpressionNode, ExpressionNode)>,
 }
 
 impl Node for HashLiteral {
