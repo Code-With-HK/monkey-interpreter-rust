@@ -73,6 +73,10 @@ impl Lexer {
             '*' => Lexer::new_token(TokenKind::Asterisk, self.ch),
             '<' => Lexer::new_token(TokenKind::Lt, self.ch),
             '>' => Lexer::new_token(TokenKind::Gt, self.ch),
+            '"' => Token {
+                kind: TokenKind::String,
+                literal: self.read_string(),
+            },
             _ => {
                 return if Lexer::is_letter(self.ch) {
                     let literal = self.read_identifier();
@@ -142,6 +146,17 @@ impl Lexer {
         }
         num
     }
+
+    fn read_string(&mut self) -> String {
+        let position = self.position + 1;
+        self.read_char();
+        while self.ch != '"' && self.ch != '\0' {
+            self.read_char();
+        }
+
+        let string_slice = &self.input[position..self.position];
+        string_slice.into_iter().collect()
+    }
 }
 
 #[cfg(test)]
@@ -172,6 +187,8 @@ mod test {
 
         10 == 10;
         10 != 9;
+        "foobar"
+        "foo bar"
         "#;
 
         let expected: Vec<Token> = vec![
@@ -466,6 +483,14 @@ mod test {
             Token {
                 kind: TokenKind::Semicolon,
                 literal: ";".to_string(),
+            },
+            Token {
+                kind: TokenKind::String,
+                literal: "foobar".to_string(),
+            },
+            Token {
+                kind: TokenKind::String,
+                literal: "foo bar".to_string(),
             },
             Token {
                 kind: TokenKind::Eof,
