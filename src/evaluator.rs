@@ -1,8 +1,8 @@
-use std::ops::Deref;
+use std::{collections::HashMap, ops::Deref};
 
 use crate::{
     ast::{BlockStatement, ExpressionNode, Identifier, IfExpression, Program, StatementNode},
-    object::{Environment, Function, Object},
+    object::{Environment, Function, HashPair, HashStruct, Hashable, Object},
 };
 
 const TRUE: Object = Object::Boolean(true);
@@ -127,6 +127,31 @@ impl Evaluator {
                     }
 
                     self.eval_index_expression(left, index)
+                }
+                ExpressionNode::Hash(hash) => {
+                    let mut pairs = HashMap::new();
+
+                    for (k, v) in hash.pairs {
+                        let key = self.eval_expression(Some(k));
+                        if Self::is_error(&key) {
+                            return key;
+                        }
+
+                        let hash_key = match key.hash_key() {
+                            Ok(hash) => hash,
+                            Err(err) => {
+                                return Object::Error(err.to_string());
+                            }
+                        };
+
+                        let value = self.eval_expression(Some(v));
+                        if Self::is_error(&value) {
+                            return value;
+                        }
+
+                        pairs.insert(hash_key, HashPair { key, value });
+                    }
+                    Object::HashObj(HashStruct { pairs })
                 }
                 _ => NULL,
             };
@@ -351,9 +376,14 @@ impl Evaluator {
 mod test {
     use std::any;
 
-    use crate::{ast::Node, lexer::Lexer, object::Object, parser::Parser};
+    use crate::{
+        ast::Node,
+        lexer::Lexer,
+        object::{Hashable, Object},
+        parser::Parser,
+    };
 
-    use super::{Evaluator, NULL};
+    use super::{Evaluator, FALSE, NULL, TRUE};
 
     #[test]
     fn test_eval_integer_expression() {
@@ -694,6 +724,51 @@ mod test {
                 Some(expected) => test_integer_object(evaluated, *expected),
                 None => test_null_object(evaluated),
             }
+        }
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let input = r#"let two = "two";
+        {
+            "one": 10 - 9,
+            "two": 1 + 1,
+            "thr" + "ee": 6/2,
+            4: 4,
+            true: 5,
+            false: 6,
+        }"#;
+
+        let evaluated = test_eval(input);
+
+        match evaluated {
+            Object::HashObj(hash) => {
+                let expected = vec![
+                    (Object::StringObj("one".to_string()).hash_key(), 1),
+                    (Object::StringObj("two".to_string()).hash_key(), 2),
+                    (Object::StringObj("three".to_string()).hash_key(), 3),
+                    (Object::Integer(4).hash_key(), 4),
+                    (TRUE.hash_key(), 5),
+                    (FALSE.hash_key(), 6),
+                ];
+
+                assert_eq!(
+                    hash.pairs.len(),
+                    expected.len(),
+                    "hash object has wrong number of pairs. got={}, expected={}",
+                    hash.pairs.len(),
+                    expected.len()
+                );
+
+                for (expected_key, expected_value) in expected {
+                    let pair = match hash.pairs.get(expected_key.as_ref().unwrap()) {
+                        Some(pair) => pair,
+                        None => panic!("no pair for given key in pairs"),
+                    };
+                    test_integer_object(pair.value.clone(), expected_value);
+                }
+            }
+            other => panic!("eval did not return hash obj, got={:?}", other),
         }
     }
 
