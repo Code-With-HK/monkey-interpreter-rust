@@ -105,6 +105,9 @@ impl Evaluator {
 
                     self.apply_function(function, args)
                 }
+                ExpressionNode::StringExp(string_literal) => {
+                    Object::StringObj(string_literal.value)
+                }
                 _ => Object::Null,
             };
         }
@@ -519,6 +522,19 @@ mod test {
         "#;
 
         test_integer_object(test_eval(input), 4);
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let input = r#""Hello World!""#;
+        let evaluated = test_eval(input);
+
+        match evaluated {
+            Object::StringObj(str) => {
+                assert_eq!(str, "Hello World!", "String has wrong value. got={}", str);
+            }
+            other => panic!("object is not string. got={:?}", other),
+        }
     }
 
     fn test_null_object(obj: Object) {
