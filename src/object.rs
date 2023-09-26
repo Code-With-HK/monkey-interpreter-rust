@@ -2,6 +2,8 @@ use std::{collections::HashMap, fmt::Display};
 
 use crate::ast::{BlockStatement, Identifier, Node};
 
+pub type BuiltinFunction = fn(Vec<Object>) -> Object;
+
 #[derive(Debug, Clone)]
 pub enum Object {
     Integer(i64),
@@ -10,6 +12,7 @@ pub enum Object {
     Error(String),
     Func(Function),
     StringObj(String),
+    Builtin(BuiltinFunction),
     Null,
 }
 
@@ -22,6 +25,7 @@ impl Object {
             Self::Error(_) => String::from("ERROR"),
             Self::Func(_) => String::from("FUNCTION"),
             Self::StringObj(_) => String::from("STRING"),
+            Self::Builtin(_) => String::from("BUILTIN"),
             Self::Null => String::from("NULL"),
         }
     }
@@ -52,6 +56,7 @@ impl Display for Object {
                 write!(f, "{}", out)
             }
             Self::StringObj(string) => write!(f, "{}", string),
+            Self::Builtin(_) => write!(f, "builtin function"),
             Self::Null => write!(f, "null"),
         }
     }
