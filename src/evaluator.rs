@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::{
     ast::{BlockStatement, ExpressionNode, Identifier, IfExpression, Program, StatementNode},
     object::{Environment, Function, Object},
@@ -90,10 +92,68 @@ impl Evaluator {
                     body: fn_lit.body,
                     env: self.env.clone(),
                 }),
+                ExpressionNode::Call(call_exp) => {
+                    let function = self.eval_expression(Some(call_exp.function.deref().clone()));
+                    if Self::is_error(&function) {
+                        return function;
+                    }
+
+                    let args = self.eval_expressions(call_exp.arguments);
+                    if args.len() == 1 && Self::is_error(&args[0]) {
+                        return args[0].clone();
+                    }
+
+                    self.apply_function(function, args)
+                }
                 _ => Object::Null,
             };
         }
         Object::Null
+    }
+
+    fn apply_function(&mut self, func: Object, args: Vec<Object>) -> Object {
+        match func {
+            Object::Func(function) => {
+                let old_env = self.env.clone();
+                let extended_env = self.extended_function_env(function.clone(), args);
+                self.env = extended_env;
+                let evaluated = self.eval_block_statement(function.body);
+                self.env = old_env;
+                return Self::unwrap_return_value(evaluated);
+            }
+            other => Object::Error(format!("not a function: {}", other.object_type())),
+        }
+    }
+
+    fn extended_function_env(&self, function: Function, args: Vec<Object>) -> Environment {
+        let mut env = Environment::new_enclosed_environment(Box::new(function.env));
+
+        for (idx, param) in function.parameters.into_iter().enumerate() {
+            env.set(param.value, args[idx].clone());
+        }
+
+        env
+    }
+
+    fn unwrap_return_value(obj: Object) -> Object {
+        match obj {
+            Object::ReturnValue(ret) => *ret,
+            _ => obj,
+        }
+    }
+
+    fn eval_expressions(&mut self, expressions: Vec<ExpressionNode>) -> Vec<Object> {
+        let mut result = vec![];
+
+        for exp in expressions {
+            let evaluated = self.eval_expression(Some(exp));
+            if Self::is_error(&evaluated) {
+                return vec![evaluated];
+            }
+            result.push(evaluated);
+        }
+
+        result
     }
 
     fn eval_prefix_expression(operator: String, right: Object) -> Object {
@@ -428,6 +488,22 @@ mod test {
                 );
             }
             other => panic!("object is not Function. got={:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_function_application() {
+        let tests = vec![
+            ("let identity = fn(x) { x; }; identity(5);", 5),
+            ("let identity = fn(x) { return x; }; identity(5);", 5),
+            ("let double = fn(x) { x * 2; }; double(5);", 10),
+            ("let add = fn(x, y) { x + y; }; add(5, 5);", 10),
+            ("let add = fn(x, y) { x+ y; }; add(5 + 5, add(5, 5));", 20),
+            ("fn(x) { x; }(5)", 5),
+        ];
+
+        for test in tests {
+            test_integer_object(test_eval(test.0), test.1);
         }
     }
 
