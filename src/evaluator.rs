@@ -184,6 +184,17 @@ impl Evaluator {
             (Object::Integer(left), Object::Integer(right), op) => {
                 Self::eval_integer_infix_expression(op, *left, *right)
             }
+            (Object::StringObj(left_str), Object::StringObj(right_str), operator) => {
+                return match operator.as_str() {
+                    "+" => Object::StringObj(format!("{}{}", left_str, right_str)),
+                    _ => Object::Error(format!(
+                        "unknown operator: {} {} {}",
+                        left.object_type(),
+                        operator,
+                        right.object_type()
+                    )),
+                };
+            }
             (Object::Boolean(l), Object::Boolean(r), operator) => {
                 return match operator.as_str() {
                     "==" => Self::native_bool_to_boolean_object(l == r),
@@ -439,6 +450,7 @@ mod test {
                 "unknown operator: BOOLEAN + BOOLEAN",
             ),
             ("foobar", "identifier not found: foobar"),
+            (r#""Hello" - "World""#, "unknown operator: STRING - STRING"),
         ];
 
         for test in tests {
@@ -534,6 +546,21 @@ mod test {
                 assert_eq!(str, "Hello World!", "String has wrong value. got={}", str);
             }
             other => panic!("object is not string. got={:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_string_concatenation() {
+        let input = r#""Hello" + " " + "World!""#;
+        let evaluated = test_eval(input);
+
+        match evaluated {
+            Object::StringObj(string) => assert_eq!(
+                string, "Hello World!",
+                "string has wrong value. got={}",
+                string
+            ),
+            other => panic!("object is not string literal. got={:?}", other),
         }
     }
 
