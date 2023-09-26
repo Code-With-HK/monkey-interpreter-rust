@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    fmt::Display,
+    hash::{Hash, Hasher},
+};
 
 use crate::{
     ast::{BlockStatement, Identifier, Node},
@@ -135,4 +139,64 @@ pub struct Function {
     pub parameters: Vec<Identifier>,
     pub body: BlockStatement,
     pub env: Environment,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct HashKey {
+    pub object_type: String,
+    pub value: i64,
+}
+
+pub trait Hashable {
+    fn hash_key(&self) -> Result<HashKey, String>;
+}
+
+impl Hashable for Object {
+    fn hash_key(&self) -> Result<HashKey, String> {
+        match &self {
+            Object::Boolean(bool) => {
+                let value = if *bool { 1 } else { 0 };
+                Ok(HashKey {
+                    object_type: self.object_type(),
+                    value,
+                })
+            }
+            Object::Integer(int) => Ok(HashKey {
+                object_type: self.object_type(),
+                value: *int,
+            }),
+            Object::StringObj(string) => {
+                let mut hasher = DefaultHasher::new();
+                string.hash(&mut hasher);
+                Ok(HashKey {
+                    object_type: self.object_type(),
+                    value: hasher.finish() as i64,
+                })
+            }
+            other => Err(format!("unusable as hash key: {}", other.object_type())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{Hashable, Object};
+
+    #[test]
+    fn test_string_hash_key() {
+        let hello1 = Object::StringObj("Hello World".to_string());
+        let hello2 = Object::StringObj("Hello World".to_string());
+        let some_other = Object::StringObj("Some Other".to_string());
+
+        assert_eq!(
+            hello1.hash_key(),
+            hello2.hash_key(),
+            "strings with same content have different hash keys"
+        );
+        assert_ne!(
+            hello1.hash_key(),
+            some_other.hash_key(),
+            "strings with different content have same hash keys"
+        );
+    }
 }
